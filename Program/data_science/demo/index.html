@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <link
+      href="https://fonts.googleapis.com/css?family=Roboto:100,300,400,500,700,900"
+      rel="stylesheet"
+    />
+    <link
+      href="https://cdn.jsdelivr.net/npm/@mdi/font@6.x/css/materialdesignicons.min.css"
+      rel="stylesheet"
+    />
+    <link href="https://cdn.jsdelivr.net/npm/vuetify@2.x/dist/vuetify.min.css" rel="stylesheet" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, minimal-ui"
+    />
+  </head>
+  <body>
+    <div id="app">
+      <v-app>
+        <v-main>
+          <v-container>
+            <br />
+            Model Demo
+            <br />
+            <br />
+
+            <v-btn-toggle v-model="weather" tile color="deep-purple accent-3" group mandatory>
+              <v-btn value="normal"> No Weather Preference </v-btn>
+
+              <v-btn value="warm"> Prefer Warm Climate </v-btn>
+
+              <v-btn value="cold"> Prefer Cold Climate </v-btn>
+            </v-btn-toggle>
+            <br />
+
+            <br />
+            <v-autocomplete
+              v-model="values"
+              :items="items"
+              filled
+              chips
+              label="Visited Cities"
+              multiple
+            ></v-autocomplete>
+            <br />
+
+            Recs:
+            <ul>
+              <li v-for="item in recs" :key="item.id">
+                <strong>{{ item[1] }}</strong>: {{item[0]}}
+              </li>
+            </ul>
+          </v-container>
+        </v-main>
+      </v-app>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/vue@2.x/dist/vue.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vuetify@2.x/dist/vuetify.js"></script>
+    <script src="./data2.js"></script>
+
+    <script>
+      var d = {};
+      for (var weather in data) {
+        d[weather] = {};
+        for (var i = 0; i < data[weather].length; i++) {
+          var { A, B, support, confidence, lift } = data[weather][i];
+          if (!(A in d[weather])) {
+            d[weather][A] = {};
+          }
+          if (!(B in d[weather][A])) {
+            d[weather][A][B] = 0;
+          }
+
+          d[weather][A][B] += parseFloat(lift);
+        }
+      }
+      var cities = [];
+      for (var key in d['normal']) {
+        cities.push(key);
+      }
+
+      cities.sort();
+
+      console.log('...', d);
+      console.log('...', data);
+
+      new Vue({
+        el: '#app',
+        vuetify: new Vuetify(),
+        data: () => ({
+          items: cities,
+          values: [],
+          weather: 'normal',
+          value: null,
+          recs: [['No Response', 'Select Cities above']],
+        }),
+        watch: {
+          values: function (val) {
+            console.log('Updating recs');
+            var matches = {};
+
+            var visited = {};
+
+            var climates = { normal: '', warm: '', cold: '' };
+            for (var weather in climates) {
+              for (var v in val) {
+                var city = val[v];
+                visited[city] = '';
+
+                var maxLift = 0;
+                for (var newCity in d[weather][city]) {
+                  var lift = d[weather][city][newCity];
+
+                  if (!(newCity in matches)) {
+                    matches[newCity] = 0;
+                  }
+
+                  maxLift = Math.max(maxLift, lift);
+                }
+
+                for (var newCity in d[weather][city]) {
+                  var lift = d[weather][city][newCity];
+
+                  var delta_score = lift / maxLift;
+
+                  if (this.weather == weather) {
+                    delta_score *= 1.5;
+                  } else {
+                    delta_score *= 0.66;
+                  }
+                  matches[newCity] += delta_score;
+                }
+              }
+            }
+
+            var bests = [];
+            for (var key in matches) {
+              if (!(key in visited)) {
+                bests.push([matches[key], key]);
+              }
+            }
+            bests.sort(function (a, b) {
+              return b[0] - a[0];
+            });
+            // bests = sorted(bests, key=float)
+            // bests.sort().reverse()
+            console.log(bests);
+            this.recs = bests;
+          },
+          weather: function (val) {
+            this.values = JSON.parse(JSON.stringify(this.values));
+          },
+        },
+      });
+    </script>
+  </body>
+</html>
